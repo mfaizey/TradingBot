@@ -8,7 +8,6 @@ from typing import Iterable, Optional
 from app.config import get_settings
 from app.schemas import AssetPosition, BotSettings, ChainBalance, Opportunity, StrategyState, TradeRecord, WalletSnapshot
 
-
 @dataclass
 class PositionState:
     symbol: str

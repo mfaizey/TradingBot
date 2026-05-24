@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import math
 import time
+from typing import Protocol
 from uuid import uuid4
 
+from app.config import Settings, get_settings
 from app.schemas import BotSettings, Opportunity
+
+
+class MarketDataProvider(Protocol):
+    async def discover(self, settings: BotSettings) -> list[Opportunity]: ...
 
 
 class MockMarketDataProvider:
@@ -98,11 +104,35 @@ class MockMarketDataProvider:
                     confidence=round(confidence, 2),
                     risk_score=round(risk_score, 2),
                     estimated_latency_ms=int(220 + (momentum * 310)),
-                    status="candidate",
+                    status="simulated",
                 )
             )
 
         return sorted(candidates, key=lambda item: item.expected_profit_usd, reverse=True)
 
 
-market_data_provider = MockMarketDataProvider()
+def build_market_data_provider(settings: Settings | None = None) -> MarketDataProvider:
+    resolved = settings or get_settings()
+    mode = resolved.market_mode.strip().lower()
+    if mode in {"live", "web3", "real"}:
+        from app.services.market_web3 import Web3MarketDataProvider
+
+        return Web3MarketDataProvider(resolved)
+    if mode == "ccxt":
+        from app.services.market_ccxt import CcxtMarketDataProvider
+
+        return CcxtMarketDataProvider(resolved)
+    return MockMarketDataProvider()
+
+
+def market_data_source_label(settings: Settings | None = None) -> str:
+    resolved = settings or get_settings()
+    mode = resolved.market_mode.strip().lower()
+    if mode in {"live", "web3", "real"}:
+        return "live"
+    if mode == "ccxt":
+        return "live"
+    return "simulated"
+
+
+market_data_provider = build_market_data_provider()

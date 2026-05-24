@@ -21,7 +21,7 @@ export function createWagmiConfig() {
     ssr: false,
     chains: supportedChains,
     transports: {
-      [mainnet.id]: http(process.env.NEXT_PUBLIC_MAINNET_RPC_URL),
+      [mainnet.id]: http(process.env.NEXT_PUBLIC_MAINNET_RPC_URL || undefined),
       [bsc.id]: http(process.env.NEXT_PUBLIC_BSC_RPC_URL ?? "https://bsc-dataseed.binance.org"),
       [polygon.id]: http(process.env.NEXT_PUBLIC_POLYGON_RPC_URL ?? "https://polygon-rpc.com"),
       [arbitrum.id]: http(process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL ?? "https://arb1.arbitrum.io/rpc"),
@@ -41,7 +41,7 @@ export function createWagmiConfig() {
               metadata: {
                 name: "Autonomous Trading Portal",
                 description: "Wallet integration for multi-chain trading desk",
-                url: "https://localhost:3000",
+                url: typeof window !== "undefined" ? window.location.origin : "http://localhost:3000",
                 icons: []
               }
             })

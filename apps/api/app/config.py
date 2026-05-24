@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     ccxt_api_key: str = ""
     ccxt_api_secret: str = ""
 
+    ethereum_rpc_url: str = "https://eth.llamarpc.com"
+    arbitrum_rpc_url: str = "https://arb1.arbitrum.io/rpc"
+    bsc_rpc_url: str = "https://bsc-dataseed.binance.org"
+    polygon_rpc_url: str = "https://polygon-rpc.com"
+    web3_min_liquidity_usd: float = 50_000.0
+    web3_min_spread_bps: int = 3
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

@@ -118,6 +118,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [activeConnectorName, setActiveConnectorName] = useState<string | null>(null);
   const [isSameDeviceQrAttempt, setIsSameDeviceQrAttempt] = useState(false);
   const retryRef = useRef<(() => Promise<void>) | null>(null);
+  const [reconnectSettled, setReconnectSettled] = useState(false);
   const currentProviderRef = useRef<EIP1193Provider | null>(null);
 
   const { address, chain, connector } = useAccount();
@@ -245,7 +246,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const getConnectorForChoice = useCallback(
     (choice: WalletChoice): Connector | undefined => {
-      if (choice === "metamask") return connectors.find((item) => item.id === "metaMask");
+      if (choice === "metamask") {
+        return (
+          connectors.find((item) => item.id === "metaMaskSDK") ??
+          connectors.find((item) => item.id === "metaMask")
+        );
+      }
       if (choice === "coinbase") return connectors.find((item) => item.id === "coinbaseWalletSDK");
       if (choice === "walletconnect" || choice === "trust") return connectors.find((item) => item.id === "walletConnect");
       return connectors.find((item) => item.id === "injected");
@@ -357,17 +363,45 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    setReconnectSettled(false);
     dispatchMachine({ type: "RECONNECT_REQUEST" });
     retryRef.current = async () => {
+      setReconnectSettled(false);
       dispatchMachine({ type: "RECONNECT_REQUEST" });
       await reconnectAsync();
-      dispatchMachine({ type: "RECONNECT_SUCCESS" });
+      setReconnectSettled(true);
     };
 
     reconnectAsync()
-      .then(() => dispatchMachine({ type: "RECONNECT_SUCCESS" }))
-      .catch((error) => setError(mapWalletError(error)));
+      .catch((error) => setError(mapWalletError(error)))
+      .finally(() => {
+        setReconnectSettled(true);
+      });
   }, [reconnectAsync, setError]);
+
+  useEffect(() => {
+    if (address && connector) {
+      setActiveConnectorName(connector.name);
+      if (machineState.lifecycle === "RECONNECTING" || machineState.lifecycle === "CONNECTING") {
+        dispatchMachine({ type: "CONNECT_SUCCESS" });
+      } else if (machineState.lifecycle === "DISCONNECTED") {
+        dispatchMachine({ type: "RECONNECT_SUCCESS" });
+      }
+      return;
+    }
+
+    if (!address && reconnectSettled && machineState.lifecycle === "RECONNECTING") {
+      dispatchMachine({ type: "DISCONNECT" });
+      return;
+    }
+
+    if (
+      !address &&
+      (machineState.lifecycle === "CONNECTED" || machineState.lifecycle === "SWITCHING_CHAIN")
+    ) {
+      dispatchMachine({ type: "DISCONNECT" });
+    }
+  }, [address, connector, machineState.lifecycle, reconnectSettled]);
 
   useEffect(() => {
     if (!normalizedAddress) return;

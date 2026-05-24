@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.schemas import Opportunity
 from app.services.execution import execution_service
 from app.services.market import market_data_provider
+from app.services.market_filters import filter_positive_profit
 from app.services.repository import trade_repository
 from app.services.risk import risk_manager
 from app.services.runtime import runtime_state
@@ -41,13 +42,14 @@ class AutonomousTradingEngine:
         discovered = await market_data_provider.discover(settings)
 
         approved: list[Opportunity] = []
-        for opportunity in discovered:
+        for opportunity in filter_positive_profit(discovered):
             decision = risk_manager.evaluate(opportunity, settings)
             if decision.allowed:
                 approved.append(opportunity)
 
         runtime_state.touch_scan()
-        runtime_state.update_opportunities(approved[:8])
+        # Surface live scanner output in the dashboard stream; execution stays risk-gated.
+        runtime_state.update_opportunities(discovered[:8])
 
         if runtime_state.bot_status == "running" and settings.auto_execute and approved:
             trade = await execution_service.execute(approved[0], settings)

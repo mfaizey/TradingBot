@@ -4,6 +4,8 @@ from fastapi import APIRouter, Query
 
 from app.schemas import DashboardOverview, Opportunity, TradeRecord, WalletSnapshot
 from app.services.engine import bot_engine
+from app.services.market import market_data_source_label
+from app.services.market_refresh import ensure_fresh_opportunities
 from app.services.repository import trade_repository
 from app.services.runtime import runtime_state
 
@@ -12,8 +14,7 @@ router = APIRouter()
 
 @router.get("/overview", response_model=DashboardOverview)
 async def get_overview(address: Optional[str] = Query(default=None)) -> DashboardOverview:
-    if not runtime_state.get_opportunities():
-        await bot_engine.scan_once()
+    await ensure_fresh_opportunities()
 
     wallet = runtime_state.build_wallet_snapshot(address)
     metrics = trade_repository.build_metrics(wallet.total_value_usd, runtime_state.initial_equity_usd)
@@ -22,6 +23,7 @@ async def get_overview(address: Optional[str] = Query(default=None)) -> Dashboar
         status=runtime_state.bot_status,
         last_scan_at=runtime_state.last_scan_at,
         uptime_seconds=runtime_state.uptime_seconds(),
+        market_data_source=market_data_source_label(),
         metrics=metrics,
         wallet=wallet,
         strategies=runtime_state.get_strategies(),
@@ -37,8 +39,7 @@ async def get_portfolio(address: Optional[str] = Query(default=None)) -> WalletS
 
 @router.get("/opportunities", response_model=list[Opportunity])
 async def get_opportunities() -> list[Opportunity]:
-    if not runtime_state.get_opportunities():
-        await bot_engine.scan_once()
+    await ensure_fresh_opportunities()
     return runtime_state.get_opportunities()
 
 

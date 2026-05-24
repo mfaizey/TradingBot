@@ -104,6 +104,7 @@ class DashboardOverview(BaseModel):
     status: BotStatus
     last_scan_at: Optional[datetime] = None
     uptime_seconds: int = 0
+    market_data_source: str = "simulated"
     metrics: DashboardMetrics
     wallet: WalletSnapshot
     strategies: list[StrategyState]

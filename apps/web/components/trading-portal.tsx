@@ -130,6 +130,11 @@ export function TradingPortal() {
   const deferredOverview = useDeferredValue(overview);
   const activeOverview = deferredOverview ?? overview;
 
+  const streamOpportunities = useMemo(
+    () => activeOverview?.opportunities ?? [],
+    [activeOverview?.opportunities]
+  );
+
   const refreshPortal = useCallback(async () => {
     try {
       const [nextOverview, nextSettings] = await Promise.all([
@@ -266,13 +271,19 @@ export function TradingPortal() {
               <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
                 <p className="text-xs uppercase tracking-[0.2em] text-mist/70">Connected address</p>
                 <p className="mt-2 font-medium text-ink">
-                  {truncatedAddress ?? shortenAddress(address ?? activeOverview.wallet.address)}
+                  {lifecycle === "CONNECTED" || lifecycle === "SWITCHING_CHAIN"
+                    ? (truncatedAddress ?? shortenAddress(address) ?? "Unknown")
+                    : "Not connected"}
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.2em] text-mist/70">Current network</p>
-                  <p className="mt-2 text-ink">{chainName ?? activeOverview.wallet.network}</p>
+                  <p className="mt-2 text-ink">
+                    {lifecycle === "CONNECTED" || lifecycle === "SWITCHING_CHAIN"
+                      ? (chainName ?? "Unknown network")
+                      : "—"}
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.2em] text-mist/70">Native balance</p>
@@ -563,7 +574,17 @@ export function TradingPortal() {
           </div>
         </Panel>
 
-        <Panel title="Opportunity detection stream" kicker="Scanner">
+        <Panel
+          title="Web3 opportunity stream"
+          kicker={
+            activeOverview.market_data_source === "live"
+              ? "Live on-chain DEX scanner"
+              : "Simulated Web3 scanner"
+          }
+        >
+          <p className="mb-4 text-sm text-mist">
+            Cross-DEX spreads after estimated swap fees and gas. Net-positive rows are executable; marginal rows are shown for monitoring.
+          </p>
           <div className="overflow-hidden rounded-3xl border border-white/10">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-white/6 text-mist">
@@ -575,18 +596,42 @@ export function TradingPortal() {
                 </tr>
               </thead>
               <tbody>
-                {activeOverview.opportunities.map((opportunity) => (
+                {streamOpportunities.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-mist">
+                      No cross-DEX spreads detected right now. The scanner refreshes every few seconds.
+                    </td>
+                  </tr>
+                ) : null}
+                {streamOpportunities.map((opportunity) => (
                   <tr key={opportunity.id} className="border-t border-white/8">
                     <td className="px-4 py-3">
                       <p className="font-medium text-ink">{opportunity.pair}</p>
-                      <p className="text-xs text-mist">{opportunity.chain}</p>
+                      <p className="text-xs text-mist">
+                        {opportunity.chain}
+                        {opportunity.status === "live"
+                          ? " · net positive"
+                          : opportunity.status === "marginal"
+                            ? " · below breakeven"
+                            : opportunity.status === "simulated"
+                              ? " · simulated"
+                              : ""}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-ink">{opportunity.venue_path}</p>
                       <p className="text-xs text-mist">{opportunity.strategy}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-ink">{formatUsd(opportunity.expected_profit_usd)}</p>
+                      <p
+                        className={
+                          opportunity.expected_profit_usd > 0
+                            ? "font-medium text-ink"
+                            : "font-medium text-rose-300"
+                        }
+                      >
+                        {formatUsd(opportunity.expected_profit_usd)}
+                      </p>
                       <p className="text-xs text-mist">
                         gas {formatUsd(opportunity.gas_cost_usd)} | slip {opportunity.slippage_bps} bps
                       </p>
@@ -669,7 +714,7 @@ export function TradingPortal() {
             <div className="rounded-3xl border border-white/10 bg-black/10 p-5">
               <div className="flex items-center gap-3">
                 <BarChart3 className="h-5 w-5 text-accent" />
-                <p className="font-medium text-ink">DEX + CEX abstraction</p>
+                <p className="font-medium text-ink">Web3 DEX abstraction</p>
               </div>
               <p className="mt-3">
                 The backend is split into market data, risk, execution, and storage layers so CCXT, Uniswap, PancakeSwap, SushiSwap, and other venue adapters can be added cleanly.

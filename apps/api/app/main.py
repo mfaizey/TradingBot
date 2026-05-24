@@ -1,4 +1,5 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,7 @@ from app.database import init_db
 from app.routers.control import router as control_router
 from app.routers.dashboard import router as dashboard_router
 from app.services.engine import bot_engine
+from app.services.market_refresh import run_opportunity_monitor
 from app.services.runtime import runtime_state
 
 settings = get_settings()
@@ -17,7 +19,11 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     init_db()
     await bot_engine.scan_once()
+    monitor_task = asyncio.create_task(run_opportunity_monitor())
     yield
+    monitor_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await monitor_task
     await bot_engine.shutdown()
 
 
@@ -41,8 +47,12 @@ app.include_router(control_router, prefix="/api", tags=["control"])
 
 @app.get("/health")
 async def health() -> dict[str, str]:
+    from app.services.market import market_data_source_label
+
     return {
         "status": "ok",
         "bot_status": runtime_state.bot_status,
         "environment": settings.environment,
+        "market_data_source": market_data_source_label(),
+        "market_mode": settings.market_mode,
     }

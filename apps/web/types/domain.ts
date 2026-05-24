@@ -99,6 +99,7 @@ export interface DashboardOverview {
   status: BotStatus;
   last_scan_at: string | null;
   uptime_seconds: number;
+  market_data_source: "live" | "simulated" | string;
   metrics: DashboardMetrics;
   wallet: WalletSnapshot;
   strategies: StrategyState[];
